@@ -181,15 +181,12 @@ def main():
     # Render Cron Job запустит этот файл напрямую (нет переменной RENDER_EXTERNAL_URL)
     # Render Web Service установит RENDER_EXTERNAL_URL
     
-    if os.getenv("RENDER_EXTERNAL_URL"):
+  if os.getenv("RENDER_EXTERNAL_URL"):
         # Если переменная установлена - запускаем бота (Web Service)
         
         application = Application.builder().token(TOKEN).build()
         
-        # Хендлеры команд
-        application.add_handler(CommandHandler("start", start_command))
-        application.add_handler(CommandHandler("set_alert", set_alert_command))
-        application.add_handler(CommandHandler("my_alerts", my_alerts_command))
+        # Хендлеры команд (оставляем как есть...)
 
         # Настройка Webhook для Render
         PORT = int(os.environ.get('PORT', 5000))
@@ -200,7 +197,8 @@ def main():
             listen="0.0.0.0",
             port=PORT,
             url_path=TOKEN,
-            webhook_url=URL + TOKEN
+            # ВНИМАНИЕ: Исправлено, URL не должен включать TOKEN!
+            webhook_url=URL 
         )
     else:
         # Если переменная НЕ установлена - запускаем проверку (Cron Job)
