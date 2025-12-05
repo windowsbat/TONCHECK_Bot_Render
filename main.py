@@ -137,7 +137,16 @@ async def check_alerts():
         new_targets = []
         
         for target_price in data['targets']:
-            if (current_price >= target_price) or (current_price <= target_price): # Срабатывает при достижении
+            # Логика срабатывания: при достижении или превышении целевой цены
+            # Мы используем (current_price >= target_price) or (current_price <= target_price),
+            # что по сути срабатывает всегда, если цена меняется. 
+            # Исправляем логику на более конкретную:
+            # - Если целевая цена выше текущей, алерт не сработал.
+            # - Если целевая цена ниже текущей, алерт не сработал.
+            
+            # Внимание: для простоты оставим алерт как односторонний (цена достигла target_price)
+            # В оригинальном коде была ошибка (срабатывает всегда), исправляем:
+            if current_price >= target_price: # Срабатывает, если цена достигла или превысила
                 
                 # Отправляем уведомление
                 message = (
@@ -154,6 +163,7 @@ async def check_alerts():
                     if user_id not in alerts_to_remove:
                         alerts_to_remove[user_id] = True
             else:
+                # Если алерт не сработал, оставляем его в списке
                 new_targets.append(target_price)
         
         # Обновляем список алертов для пользователя
@@ -175,34 +185,28 @@ async def check_alerts():
 # --- 5. ОСНОВНАЯ ТОЧКА ВХОДА ---
 
 def main():
-    """Запускает либо WebHook (бота), либо Cron Job (проверку)."""
+    """Запускает либо Polling (бота), либо Cron Job (проверку)."""
     
     # Мы используем env-переменную, чтобы понять, что нам делать
-    # Render Cron Job запустит этот файл напрямую (нет переменной RENDER_EXTERNAL_URL)
-    # Render Web Service установит RENDER_EXTERNAL_URL
     
-  if os.getenv("RENDER_EXTERNAL_URL"):
+    if os.getenv("RENDER_EXTERNAL_URL"):
         # Если переменная установлена - запускаем бота (Web Service)
         
+        print("Запуск Polling-бота...")
         application = Application.builder().token(TOKEN).build()
         
-        # Хендлеры команд (оставляем как есть...)
+        # Хендлеры команд
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("set_alert", set_alert_command))
+        application.add_handler(CommandHandler("my_alerts", my_alerts_command))
 
-        # Настройка Webhook для Render
-        PORT = int(os.environ.get('PORT', 5000))
-        URL = os.environ.get('RENDER_EXTERNAL_URL')
+        # Запускаем Polling (опрос):
+        # Это более стабильный метод для бесплатных хостингов, чем Webhook.
+        application.run_polling(poll_interval=1.0) 
         
-        print(f"Запуск Webhook на {URL}, порт {PORT}")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=TOKEN,
-            # ВНИМАНИЕ: Исправлено, URL не должен включать TOKEN!
-            webhook_url=URL 
-        )
     else:
         # Если переменная НЕ установлена - запускаем проверку (Cron Job)
-        # Запускаем асинхронную функцию в синхронном окружении
+        print("Запуск Cron Job для проверки алертов...")
         asyncio.run(check_alerts())
 
 
